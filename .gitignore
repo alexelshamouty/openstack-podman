@@ -1,0 +1,4 @@
+*.service
+keystone/credential-keys/*
+keystone/fernet-keys/*
+
