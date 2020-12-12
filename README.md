@@ -68,3 +68,67 @@ openstack endpoint list --debug #Just so you can make sure that all is good
 
 
 # Glance
+
+You have to have mariadb docker started and running by now, change the name mariadb below to the same name of your container and run those commands
+
+```
+ docker exec -it mariadb mysql -u root -p -Nse 'create database glance;'
+ docker exec -it mariadb mysql -u root -p -Nse "GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%' IDENTIFIED BY 'glance';"
+```
+
+
+Now we need a user for glance it self and a place where this user has an admin role on, this is typically the 'service' project.
+This is basically a keystone project, we will be using this project accross all services so it makes sense that we call it service;
+
+This will create a user
+```
+ openstack user create --domain default --password glance glance
+```
+This will create a project called service
+```
+openstack project create service
+```
+
+This will add the user glance as an admin to the service project
+```
+openstack role add --project service --user glance admin
+```
+
+Now we will add an image service entity to OpenStack:
+
+```
+openstack service create --name glance image
+```
+
+And now we wil use that service entity to add endpoints to THAT service, you need 3 endpoints, admin for admin, public and internal:
+Those endpoints provides differen APIs(usually) or middleswares for different purposes.
+
+
+```
+openstack endpoint create --region dev image public http://localhost:9292
+openstack endpoint create --region dev image public http://localhost:9292
+openstack endpoint create --region dev image public http://localhost:9292
+```
+
+Now you can build your docker image like before with keystone.
+
+Once you are done with that, use that image and bootstrap your glance-api
+
+```
+docker run -it --rm --network host aelshamouty/glance-binary glance-manage db_sync
+```
+
+Now you can go ahead and create a container for your glance-api
+```
+docker create --name glance-api --network host aelshamouty/glance-binary:latest /usr/bin/glance-api --config-file /etc/glance/glance-api.conf
+podman generate systemd glance-api > container-glance-api.service
+```
+
+Move the service to your local user systemd, enable, start.
+
+
+Now try your image service:
+
+```
+openstack image list --debug
+```
